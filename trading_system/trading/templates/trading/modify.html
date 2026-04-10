@@ -1,0 +1,185 @@
+{% extends 'trading/base.html' %}
+
+{% block title %}Modify Orders{% endblock %}
+
+{% block content %}
+<style>
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        animation: fadeIn 0.8s ease-in-out;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(8px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    .dashboard-title {
+        color: var(--accent);
+        text-align: center;
+        margin-bottom: 32px;
+        text-shadow: 0 0 12px rgba(0, 255, 255, 0.45);
+    }
+    h3 {
+        color: var(--accent);
+        margin-bottom: 12px;
+        text-transform: uppercase;
+        font-size: 1rem;
+    }
+
+    .dashboard-subtitle {
+        text-align: center;
+        color: var(--muted);
+        margin-bottom: 24px;
+    }
+
+    .table .btn {
+        font-size: 0.72rem;
+        padding: 7px 10px;
+    }
+</style>
+
+<div class="container">
+    <h2 class="dashboard-title">Modify Order</h2>
+    <p class="dashboard-subtitle">Review grouped levels and open an order for manual edit.</p>
+
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <h3>Buy Orders</h3>
+                <div class="table-responsive">
+                    <table id="buy-orders" class="table">
+                        <thead>
+                            <tr>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                                <th>Status</th>
+                                <th>Modify</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="4">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="card">
+                <h3>Sell Orders</h3>
+                <div class="table-responsive">
+                    <table id="sell-orders" class="table">
+                        <thead>
+                            <tr>
+                                <th>Price</th>
+                                <th>Quantity</th>
+                                <th>Status</th>
+                                <th>Modify</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td colspan="4">Loading...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function updateBuyOrders() {
+        fetch('/orderbook/get_buy_orders/')
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.querySelector('#buy-orders tbody');
+                tableBody.innerHTML = '';
+
+                const groupedOrders = {};
+                data.buy_orders.forEach(order => {
+                    if (!groupedOrders[order.price]) {
+                        groupedOrders[order.price] = { disclosed: 0, is_matched: order.is_matched };
+                    }
+                    groupedOrders[order.price].disclosed += order.disclosed;
+                });
+
+                const sortedOrders = Object.entries(groupedOrders).sort((a, b) => {
+                    const priceA = parseFloat(a[0]);
+                    const priceB = parseFloat(b[0]);
+                    return priceB - priceA;
+                });
+
+                sortedOrders.forEach(([price, details]) => {
+                    const row = `
+                        <tr>
+                            <td>${price}</td>
+                            <td>${details.disclosed}</td>
+                            <td>${details.is_matched ? 'Matched' : 'Unmatched'}</td>
+                            <td>
+                                <a href="{% url 'modify_page' %}" class="btn">Modify</a>
+                            </td>
+                        </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            })
+            .catch(error => console.error('Error fetching Buy Orders:', error));
+    }
+
+    function updateSellOrders() {
+        fetch('/orderbook/get_sell_orders/')
+            .then(response => response.json())
+            .then(data => {
+                const tableBody = document.querySelector('#sell-orders tbody');
+                tableBody.innerHTML = '';
+
+                const groupedOrders = {};
+                data.sell_orders.forEach(order => {
+                    const disclosed = parseFloat(order.disclosed);
+                    const price = parseFloat(order.price);
+                    if (isNaN(disclosed) || isNaN(price)) {
+                        return;
+                    }
+
+                    if (!groupedOrders[price]) {
+                        groupedOrders[price] = { disclosed: 0, is_matched: order.is_matched };
+                    }
+                    groupedOrders[price].disclosed += disclosed;
+                });
+
+                const sortedOrders = Object.entries(groupedOrders).sort((a, b) => {
+                    const priceA = parseFloat(a[0]);
+                    const priceB = parseFloat(b[0]);
+                    return priceA - priceB;
+                });
+
+                sortedOrders.forEach(([price, details]) => {
+                    const row = `
+                        <tr>
+                            <td>${price}</td>
+                            <td>${details.disclosed}</td>
+                            <td>${details.is_matched ? 'Matched' : 'Unmatched'}</td>
+                            <td>
+                                <a href="{% url 'modify_page' %}" class="btn">Modify</a>
+                            </td>
+                        </tr>`;
+                    tableBody.innerHTML += row;
+                });
+            })
+            .catch(error => console.error('Error fetching Sell Orders:', error));
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        updateBuyOrders();
+        updateSellOrders();
+        setInterval(() => {
+            updateBuyOrders();
+            updateSellOrders();
+        }, 3000);
+    });
+</script>
+{% endblock %}
+
+
+

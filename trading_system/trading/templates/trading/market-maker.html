@@ -1,0 +1,1400 @@
+{% extends 'trading/base.html' %}
+
+{% block title %}Market Maker{% endblock %}
+
+{% block content %}
+<style>
+  .mm-page {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .mm-header {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+  }
+  .mm-header h2 {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+  }
+  .mm-subtitle {
+    color: var(--muted);
+  }
+  .mm-grid {
+    display: grid;
+    gap: 24px;
+    grid-template-columns: minmax(320px, 2fr) minmax(280px, 1fr);
+  }
+  .mm-card-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .mm-badge {
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    background: rgba(33, 139, 255, 0.15);
+    color: var(--accent-2);
+  }
+  .mm-form-grid {
+    display: grid;
+    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+  .mm-section {
+    padding: 16px;
+    border-radius: 12px;
+    background: rgba(10, 17, 29, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .mm-section h4 {
+    margin-bottom: 12px;
+  }
+  .mm-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 12px;
+    flex-wrap: wrap;
+  }
+  .mm-actions .btn {
+    flex: 1 1 180px;
+  }
+  .mm-table-wrap {
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .mm-kpi {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+  .mm-kpi div {
+    background: rgba(15, 24, 40, 0.8);
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.04);
+  }
+  .mm-kpi span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.75rem;
+  }
+
+  .yn-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .yn-option {
+    border: 1px solid rgba(0, 255, 255, 0.32);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+  }
+
+  .yn-option:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .yn-option.active {
+    color: var(--accent);
+    border-color: rgba(0, 255, 255, 0.7);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.24);
+    background: rgba(0, 255, 255, 0.1);
+  }
+
+  .yn-toggle.is-disabled .yn-option {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .snapshot-tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .snapshot-tab {
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--muted);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-transform: uppercase;
+  }
+
+  .snapshot-tab.active {
+    color: var(--text);
+    border-color: rgba(0, 255, 255, 0.65);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.25);
+    background: rgba(0, 255, 255, 0.14);
+  }
+
+  .snapshot-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(90px, 1fr));
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .snapshot-metric {
+    background: rgba(0, 0, 0, 0.24);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 10px;
+    padding: 8px;
+  }
+
+  .snapshot-metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.66rem;
+    margin-bottom: 4px;
+  }
+
+  .snapshot-metric strong {
+    font-size: 0.9rem;
+  }
+
+  #expected-price-chart {
+    width: 100%;
+    height: 120px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.25);
+    margin-bottom: 12px;
+    display: block;
+  }
+
+  .expected-chart-wrap {
+    position: relative;
+    margin-bottom: 12px;
+  }
+
+  .expected-chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(6, 12, 20, 0.95);
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    box-shadow: 0 0 14px rgba(0, 255, 255, 0.2);
+    transform: translate(-50%, -110%);
+    z-index: 3;
+    display: none;
+  }
+
+  .ladder-head,
+  .ladder-row,
+  .ladder-spread {
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .ladder-head {
+    color: var(--muted);
+    font-size: 0.68rem;
+    margin-bottom: 6px;
+  }
+
+  .ladder-row {
+    font-size: 0.78rem;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
+  .ladder-cell-size {
+    position: relative;
+    overflow: hidden;
+    border-radius: 999px;
+    min-height: 22px;
+    display: flex;
+    align-items: center;
+    padding-left: 8px;
+  }
+
+  .ladder-depth {
+    position: absolute;
+    inset: 0 auto 0 0;
+    border-radius: 999px;
+    opacity: 0.35;
+  }
+
+  .ladder-depth.sell {
+    background: rgba(248, 81, 73, 0.5);
+  }
+
+  .ladder-depth.buy {
+    background: rgba(46, 160, 67, 0.5);
+  }
+
+  .ladder-value {
+    position: relative;
+    z-index: 1;
+  }
+
+  .ladder-row.sell .ladder-price {
+    color: var(--danger);
+  }
+
+  .ladder-row.buy .ladder-price {
+    color: var(--success);
+  }
+
+  .ladder-spread {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.72rem;
+    margin: 6px 0;
+  }
+
+  .trade-feed {
+    display: grid;
+    gap: 6px;
+    max-height: 230px;
+    overflow-y: auto;
+  }
+
+  .trade-feed-row {
+    display: grid;
+    grid-template-columns: 1fr 0.8fr 0.8fr;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.22);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.74rem;
+  }
+
+  .mm-grid-tight {
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .compact-table {
+    font-size: 0.8rem;
+  }
+
+  .compact-table th,
+  .compact-table td {
+    padding: 8px 10px;
+  }
+
+  @media (max-width: 980px) {
+    .mm-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="mm-page">
+  <div class="card" style="text-align: center;">
+    <h2 style="margin-bottom: 8px; text-shadow: 0 0 12px rgba(0, 255, 255, 0.45);">Welcome, {{ request.user.username }}!</h2>
+    <p class="mm-subtitle">Your market-making dashboard is ready. Quote both sides and manage live exposure.</p>
+  </div>
+
+  <div class="mm-header">
+    <div>
+      <h2>Market Maker Console</h2>
+      <p class="mm-subtitle">Submit two-sided quotes, monitor exposure, and manage active orders.</p>
+    </div>
+    <a href="{% url 'orderbook' %}" class="btn">View Orderbook</a>
+  </div>
+
+  <div class="mm-grid">
+    <div class="card">
+      <div class="mm-card-title">
+        <h3>Place Two-Sided Quote</h3>
+        <span class="mm-badge">LIMIT ONLY</span>
+      </div>
+      <div class="mm-kpi">
+        <div>
+          <span>Bid / Ask</span>
+          Provide both sides
+        </div>
+        <div>
+          <span>Iceberg Orders</span>
+          Hidden quantities
+        </div>
+        <div>
+          <span>IOC + Stoploss</span>
+          One active option
+        </div>
+        <div>
+          <span>Visibility</span>
+          Disclosed >= 10%
+        </div>
+      </div>
+      <form method="post" id="mmForm" onsubmit="submitTwoSided(event)">
+        {% csrf_token %}
+        <input type="hidden" name="order_mode" id="order_mode_input" value="LIMIT">
+
+        <div class="mm-form-grid">
+          <div class="mm-section">
+            <h4>Bid (Buy)</h4>
+            <div class="form-group">
+              <label for="bid_quantity">Total Quantity</label>
+              <input type="number" id="bid_quantity" class="form-control" required min="1" onchange="validateDisclosed('bid')">
+              <small style="color: var(--muted);">Full order size</small>
+            </div>
+            <div class="form-group">
+              <label for="bid_disclosed">Disclosed Qty <span style="color: #2ea043; font-weight: 600;">🔓 Iceberg</span></label>
+              <input type="number" id="bid_disclosed" class="form-control" required min="1" onchange="validateDisclosed('bid')" placeholder="Visible on orderbook">
+              <small id="bid_disclosed_hint" style="color: var(--muted);">Min: <span id="bid_min_disc">-</span> | Hidden: <span id="bid_hidden">-</span></small>
+            </div>
+            <div class="form-group">
+              <label for="bid_price">Price</label>
+              <input type="number" id="bid_price" step="0.01" class="form-control" required onchange="updateSpread()">
+            </div>
+            <div class="form-group">
+              <label for="bid_is_ioc">IOC (Immediate/Cancel)</label>
+              <input type="hidden" id="bid_is_ioc" value="False">
+              <div class="yn-toggle" id="bid_is_ioc_toggle">
+                <button type="button" class="yn-option active" data-value="False" onclick="setBinaryToggle('bid_is_ioc', 'False')">No</button>
+                <button type="button" class="yn-option" data-value="True" onclick="setBinaryToggle('bid_is_ioc', 'True')">Yes</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="bid_stoploss">Stoploss Order</label>
+              <input type="hidden" id="bid_stoploss" value="NO">
+              <div class="yn-toggle" id="bid_stoploss_toggle">
+                <button type="button" class="yn-option active" data-value="NO" onclick="setBinaryToggle('bid_stoploss', 'NO')">No</button>
+                <button type="button" class="yn-option" data-value="YES" onclick="setBinaryToggle('bid_stoploss', 'YES')">Yes</button>
+              </div>
+            </div>
+            <div class="form-group" id="bid_target_group" style="display:none;">
+              <label for="bid_target" style="color: var(--warning);">Trigger Price (Stoploss)</label>
+              <input type="number" step="0.01" id="bid_target" class="form-control" placeholder="Trigger Price">
+            </div>
+          </div>
+
+          <div class="mm-section">
+            <h4>Ask (Sell)</h4>
+            <div class="form-group">
+              <label for="ask_quantity">Total Quantity</label>
+              <input type="number" id="ask_quantity" class="form-control" required min="1" onchange="validateDisclosed('ask')">
+              <small style="color: var(--muted);">Full order size</small>
+            </div>
+            <div class="form-group">
+              <label for="ask_disclosed">Disclosed Qty <span style="color: #2ea043; font-weight: 600;">🔓 Iceberg</span></label>
+              <input type="number" id="ask_disclosed" class="form-control" required min="1" onchange="validateDisclosed('ask')" placeholder="Visible on orderbook">
+              <small id="ask_disclosed_hint" style="color: var(--muted);">Min: <span id="ask_min_disc">-</span> | Hidden: <span id="ask_hidden">-</span></small>
+            </div>
+            <div class="form-group">
+              <label for="ask_price">Price</label>
+              <input type="number" id="ask_price" step="0.01" class="form-control" required onchange="updateSpread()">
+            </div>
+            <div class="form-group">
+              <label for="ask_is_ioc">IOC (Immediate/Cancel)</label>
+              <input type="hidden" id="ask_is_ioc" value="False">
+              <div class="yn-toggle" id="ask_is_ioc_toggle">
+                <button type="button" class="yn-option active" data-value="False" onclick="setBinaryToggle('ask_is_ioc', 'False')">No</button>
+                <button type="button" class="yn-option" data-value="True" onclick="setBinaryToggle('ask_is_ioc', 'True')">Yes</button>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="ask_stoploss">Stoploss Order</label>
+              <input type="hidden" id="ask_stoploss" value="NO">
+              <div class="yn-toggle" id="ask_stoploss_toggle">
+                <button type="button" class="yn-option active" data-value="NO" onclick="setBinaryToggle('ask_stoploss', 'NO')">No</button>
+                <button type="button" class="yn-option" data-value="YES" onclick="setBinaryToggle('ask_stoploss', 'YES')">Yes</button>
+              </div>
+            </div>
+            <div class="form-group" id="ask_target_group" style="display:none;">
+              <label for="ask_target" style="color: var(--warning);">Trigger Price (Stoploss)</label>
+              <input type="number" step="0.01" id="ask_target" class="form-control" placeholder="Trigger Price">
+            </div>
+          </div>
+        </div>
+
+        <div class="mm-actions">
+          <button type="submit" class="btn" id="submitBtn">Place Bid + Ask</button>
+          <button type="button" class="btn" onclick="resetFormFields();" style="background: transparent; border: 1px solid rgba(255,255,255,0.1);">Clear Form</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="card">
+      <div class="mm-card-title">
+        <h3>Market Snapshot</h3>
+        <span class="mm-badge">LIVE</span>
+      </div>
+      <div class="snapshot-tabs">
+        <button type="button" id="snapshot-tab-book" class="snapshot-tab active" onclick="setSnapshotTab('book')">Book</button>
+        <button type="button" id="snapshot-tab-trade" class="snapshot-tab" onclick="setSnapshotTab('trade')">Trade</button>
+      </div>
+
+      <div class="snapshot-metrics">
+        <div class="snapshot-metric">
+          <span>Mid</span>
+          <strong id="metric-mid">-</strong>
+        </div>
+        <div class="snapshot-metric">
+          <span>Spread</span>
+          <strong id="metric-spread">-</strong>
+        </div>
+      </div>
+
+      <div class="expected-chart-wrap">
+        <canvas id="expected-price-chart"></canvas>
+        <div id="expected-price-tooltip" class="expected-chart-tooltip"></div>
+      </div>
+
+      <div id="snapshot-book-panel">
+        <div class="ladder-head">
+          <div>Size</div>
+          <div>Price</div>
+          <div>My Size</div>
+        </div>
+        <div id="book-ladder-rows"></div>
+      </div>
+
+      <div id="snapshot-trade-panel" style="display:none;">
+        <div id="trade-feed" class="trade-feed"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="mm-grid mm-grid-tight">
+    <div class="card">
+      <div class="mm-card-title">
+        <h3>Your Pending Orders</h3>
+        <span class="mm-badge">LIVE</span>
+      </div>
+      <div class="mm-table-wrap">
+        {% if orders %}
+        <table class="table compact-table">
+          <thead>
+            <tr>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            {% if not order.is_matched %}
+            <tr id="order-{{ order.id }}">
+              <td style="color: {% if order.order_type == 'BUY' %}var(--success){% else %}var(--danger){% endif %}">
+                {{ order.order_type }}
+              </td>
+              <td>{{ order.quantity }} ({{ order.disclosed }})</td>
+              <td>{{ order.price }}</td>
+              <td>
+                <button class="btn btn-danger" style="padding: 2px 8px; font-size: 0.7rem;" onclick="cancelOrder('{{ order.id }}')">X</button>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center" style="color: var(--muted);">No pending orders.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="mm-card-title">
+        <h3 style="color: var(--warning);">Stoploss Orders</h3>
+        <span class="mm-badge" style="background: rgba(210, 153, 34, 0.2); color: var(--warning);">TRIGGERS</span>
+      </div>
+      <div class="mm-table-wrap">
+        {% if stoploss_orders %}
+        <table class="table compact-table">
+          <thead>
+            <tr>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Limit Price</th>
+              <th>Trigger Price</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in stoploss_orders %}
+            <tr id="stoploss-{{ order.id }}">
+              <td>{{ order.order_type }}</td>
+              <td>{{ order.quantity }}</td>
+              <td>{{ order.price }}</td>
+              <td>{{ order.target_price }}</td>
+              <td>
+                <button class="btn btn-danger" style="padding: 2px 8px;" onclick="cancelStoploss('{{ order.id }}')">X</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center" style="color: var(--muted);">No stoploss orders.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="mm-card-title">
+        <h3>Your Trades</h3>
+        <span class="mm-badge">FILLED</span>
+      </div>
+      <div class="mm-table-wrap">
+        {% if trades %}
+        <table class="table compact-table">
+          <thead>
+            <tr>
+              <th>Buyer</th>
+              <th>Seller</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for trade in trades %}
+            <tr>
+              <td>{{ trade.buyer.username }}</td>
+              <td>{{ trade.seller.username }}</td>
+              <td>{{ trade.quantity }}</td>
+              <td>{{ trade.price }}</td>
+              <td>{{ trade.timestamp|date:"H:i:s" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center" style="color: var(--muted);">No trades executed.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const MM_ENDPOINTS = {
+    bestAsk: "{% url 'get_best_ask' %}",
+    bestBid: "{% url 'get_best_bid' %}",
+    buyOrders: "{% url 'get_buy_orders' %}",
+    sellOrders: "{% url 'get_sell_orders' %}",
+    trades: "{% url 'get_recent_trades' %}",
+  };
+
+  const snapshotState = {
+    bestBid: null,
+    bestAsk: null,
+    buyLevels: [],
+    sellLevels: [],
+    trades: [],
+    activeTab: 'book',
+  };
+
+  const chartState = {
+    points: [],
+    pointCoords: [],
+    hoverIndex: null,
+    minValue: NaN,
+    maxValue: NaN,
+    labels: [],
+  };
+
+  const bidQuantityInput = document.getElementById('bid_quantity');
+  const bidDisclosedInput = document.getElementById('bid_disclosed');
+  const askQuantityInput = document.getElementById('ask_quantity');
+  const askDisclosedInput = document.getElementById('ask_disclosed');
+
+  function syncPairedQuantities(sourceSide) {
+    const sourceQtyInput = sourceSide === 'bid' ? bidQuantityInput : askQuantityInput;
+    const targetQtyInput = sourceSide === 'bid' ? askQuantityInput : bidQuantityInput;
+
+    if (!sourceQtyInput.value) {
+      return;
+    }
+
+    if (targetQtyInput.value !== sourceQtyInput.value) {
+      targetQtyInput.value = sourceQtyInput.value;
+    }
+
+    validateDisclosed('bid');
+    validateDisclosed('ask');
+  }
+
+  bidQuantityInput.addEventListener('input', function () {
+    bidDisclosedInput.value = this.value;
+    syncPairedQuantities('bid');
+    validateDisclosed('bid');
+  });
+
+  askQuantityInput.addEventListener('input', function () {
+    askDisclosedInput.value = this.value;
+    syncPairedQuantities('ask');
+    validateDisclosed('ask');
+  });
+
+  bidDisclosedInput.addEventListener('input', function () {
+    validateDisclosed('bid');
+  });
+
+  askDisclosedInput.addEventListener('input', function () {
+    validateDisclosed('ask');
+  });
+
+  const bidPriceInput = document.getElementById('bid_price');
+  const askPriceInput = document.getElementById('ask_price');
+
+  bidPriceInput.addEventListener('input', updateExpectedMetrics);
+  askPriceInput.addEventListener('input', updateExpectedMetrics);
+
+  function setSnapshotTab(tab) {
+    snapshotState.activeTab = tab;
+
+    const isBook = tab === 'book';
+    document.getElementById('snapshot-book-panel').style.display = isBook ? 'block' : 'none';
+    document.getElementById('snapshot-trade-panel').style.display = isBook ? 'none' : 'block';
+    document.getElementById('snapshot-tab-book').classList.toggle('active', isBook);
+    document.getElementById('snapshot-tab-trade').classList.toggle('active', !isBook);
+  }
+
+  function aggregateOrderLevels(orders, side) {
+    const grouped = {};
+
+    orders.forEach((order) => {
+      const price = parseFloat(order.price);
+      const disclosed = parseFloat(order.disclosed);
+      if (!Number.isFinite(price) || !Number.isFinite(disclosed)) {
+        return;
+      }
+
+      const key = price.toFixed(2);
+      grouped[key] = (grouped[key] || 0) + disclosed;
+    });
+
+    const levels = Object.entries(grouped).map(([price, size]) => ({
+      price: parseFloat(price),
+      size,
+    }));
+
+    levels.sort((a, b) => side === 'buy' ? b.price - a.price : a.price - b.price);
+    return levels;
+  }
+
+  function renderBookLadder() {
+    const ladderContainer = document.getElementById('book-ladder-rows');
+    const sells = snapshotState.sellLevels.slice(0, 8);
+    const buys = snapshotState.buyLevels.slice(0, 8);
+
+    const allSizes = [...sells.map((level) => level.size), ...buys.map((level) => level.size)];
+    const maxSize = allSizes.length ? Math.max(...allSizes) : 1;
+
+    const bidPrice = parseFloat(bidPriceInput.value);
+    const askPrice = parseFloat(askPriceInput.value);
+    const quoteQty = parseFloat(bidQuantityInput.value || askQuantityInput.value || 0);
+
+    const formatMySize = (value) => Number.isFinite(value) && value > 0 ? value.toFixed(2) : '-';
+
+    const sellRows = sells.map((level) => {
+      const width = Math.max(8, (level.size / maxSize) * 100);
+      const isMyLevel = Number.isFinite(askPrice) && Math.abs(level.price - askPrice) < 0.0001;
+      return `
+        <div class="ladder-row sell">
+          <div class="ladder-cell-size">
+            <div class="ladder-depth sell" style="width:${width}%;"></div>
+            <span class="ladder-value">${level.size.toFixed(2)}</span>
+          </div>
+          <div class="ladder-price">${level.price.toFixed(2)}</div>
+          <div>${formatMySize(isMyLevel ? quoteQty : NaN)}</div>
+        </div>`;
+    }).join('');
+
+    const spreadValue = (snapshotState.bestAsk && snapshotState.bestBid)
+      ? (snapshotState.bestAsk - snapshotState.bestBid).toFixed(2)
+      : '-';
+
+    const buyRows = buys.map((level) => {
+      const width = Math.max(8, (level.size / maxSize) * 100);
+      const isMyLevel = Number.isFinite(bidPrice) && Math.abs(level.price - bidPrice) < 0.0001;
+      return `
+        <div class="ladder-row buy">
+          <div class="ladder-cell-size">
+            <div class="ladder-depth buy" style="width:${width}%;"></div>
+            <span class="ladder-value">${level.size.toFixed(2)}</span>
+          </div>
+          <div class="ladder-price">${level.price.toFixed(2)}</div>
+          <div>${formatMySize(isMyLevel ? quoteQty : NaN)}</div>
+        </div>`;
+    }).join('');
+
+    ladderContainer.innerHTML = `${sellRows}
+      <div class="ladder-spread">
+        <div>Spread</div>
+        <div>${spreadValue}</div>
+        <div></div>
+      </div>
+      ${buyRows}`;
+  }
+
+  function renderTradeFeed() {
+    const tradeFeed = document.getElementById('trade-feed');
+    if (!snapshotState.trades.length) {
+      tradeFeed.innerHTML = '<div class="trade-feed-row"><div>No trades yet</div><div>-</div><div>-</div></div>';
+      return;
+    }
+
+    tradeFeed.innerHTML = snapshotState.trades.slice(0, 10).map((trade) => {
+      const price = parseFloat(trade.price);
+      const qty = parseFloat(trade.quantity);
+      const timestamp = trade.timestamp ? new Date(trade.timestamp) : null;
+      const timeLabel = timestamp && !Number.isNaN(timestamp.getTime())
+        ? timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        : '-';
+
+      return `
+        <div class="trade-feed-row">
+          <div>${Number.isFinite(price) ? price.toFixed(2) : '-'}</div>
+          <div>${Number.isFinite(qty) ? qty.toFixed(2) : '-'}</div>
+          <div>${timeLabel}</div>
+        </div>`;
+    }).join('');
+  }
+
+  function setupExpectedChartInteractions() {
+    const canvas = document.getElementById('expected-price-chart');
+    const tooltip = document.getElementById('expected-price-tooltip');
+    if (!canvas || !tooltip) return;
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (!chartState.pointCoords.length) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+
+      let nearestIndex = 0;
+      let nearestDistance = Math.abs(chartState.pointCoords[0].x - x);
+
+      for (let index = 1; index < chartState.pointCoords.length; index += 1) {
+        const distance = Math.abs(chartState.pointCoords[index].x - x);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      }
+
+      chartState.hoverIndex = nearestIndex;
+      drawExpectedPriceChart();
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      chartState.hoverIndex = null;
+      tooltip.style.display = 'none';
+      drawExpectedPriceChart();
+    });
+  }
+
+  function buildPriceSeries() {
+    const tradesAscending = [...snapshotState.trades]
+      .slice(0, 30)
+      .map((trade) => {
+        const price = parseFloat(trade.price);
+        const timestamp = trade.timestamp ? new Date(trade.timestamp) : null;
+        if (!Number.isFinite(price)) return null;
+        return {
+          value: price,
+          label: timestamp && !Number.isNaN(timestamp.getTime())
+            ? timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+            : '-',
+        };
+      })
+      .filter(Boolean)
+      .reverse();
+
+    if (tradesAscending.length >= 2) {
+      return tradesAscending;
+    }
+
+    const bidPrice = parseFloat(bidPriceInput.value);
+    const askPrice = parseFloat(askPriceInput.value);
+    const marketBid = Number.isFinite(snapshotState.bestBid) ? snapshotState.bestBid : NaN;
+    const marketAsk = Number.isFinite(snapshotState.bestAsk) ? snapshotState.bestAsk : NaN;
+    const effectiveBid = Number.isFinite(bidPrice) ? bidPrice : marketBid;
+    const effectiveAsk = Number.isFinite(askPrice) ? askPrice : marketAsk;
+    const hasPair = Number.isFinite(effectiveBid) && Number.isFinite(effectiveAsk) && effectiveAsk > effectiveBid;
+    const mid = hasPair ? (effectiveBid + effectiveAsk) / 2 : NaN;
+
+    if (!Number.isFinite(mid)) {
+      return [];
+    }
+
+    return Array.from({ length: 12 }, (_, index) => ({
+      value: mid,
+      label: `+${index + 1}s`,
+    }));
+  }
+
+  function drawExpectedPriceChart() {
+    const canvas = document.getElementById('expected-price-chart');
+    const tooltip = document.getElementById('expected-price-tooltip');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const pixelRatio = window.devicePixelRatio || 1;
+    const displayWidth = Math.max(canvas.clientWidth, 280);
+    const displayHeight = 120;
+    const padding = { top: 10, right: 44, bottom: 18, left: 12 };
+    const plotWidth = displayWidth - padding.left - padding.right;
+    const plotHeight = displayHeight - padding.top - padding.bottom;
+
+    canvas.width = displayWidth * pixelRatio;
+    canvas.height = displayHeight * pixelRatio;
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+    const series = buildPriceSeries();
+    const points = series.map((item) => item.value);
+    const labels = series.map((item) => item.label);
+
+    if (!points.length) {
+      ctx.fillStyle = 'rgba(126, 168, 187, 0.8)';
+      ctx.font = '12px Orbitron';
+      ctx.fillText('No trade price data yet', 14, 62);
+      chartState.points = [];
+      chartState.pointCoords = [];
+      chartState.labels = [];
+      if (tooltip) tooltip.style.display = 'none';
+      return;
+    }
+
+    const pointCount = points.length;
+
+    const minValue = Math.min(...points);
+    const maxValue = Math.max(...points);
+    const range = Math.max(maxValue - minValue, 0.0001);
+
+    chartState.points = points;
+    chartState.minValue = minValue;
+    chartState.maxValue = maxValue;
+    chartState.labels = labels;
+
+    const xStep = plotWidth / (pointCount - 1);
+    const yFromValue = (value) => padding.top + (1 - ((value - minValue) / range)) * plotHeight;
+
+    const pointCoords = points.map((value, index) => ({
+      x: padding.left + index * xStep,
+      y: yFromValue(value),
+      value,
+      index,
+    }));
+    chartState.pointCoords = pointCoords;
+
+    ctx.strokeStyle = 'rgba(126, 168, 187, 0.22)';
+    ctx.lineWidth = 1;
+    const gridRows = 4;
+    for (let row = 0; row <= gridRows; row += 1) {
+      const y = padding.top + (row / gridRows) * plotHeight;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(displayWidth - padding.right, y);
+      ctx.stroke();
+
+      const labelValue = maxValue - (row / gridRows) * (maxValue - minValue);
+      ctx.fillStyle = 'rgba(126, 168, 187, 0.8)';
+      ctx.font = '10px Orbitron';
+      ctx.fillText(labelValue.toFixed(2), displayWidth - padding.right + 4, y + 3);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(pointCoords[0].x, pointCoords[0].y);
+    for (let index = 1; index < pointCoords.length; index += 1) {
+      const prev = pointCoords[index - 1];
+      const current = pointCoords[index];
+      const cx = (prev.x + current.x) / 2;
+      const cy = (prev.y + current.y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, cx, cy);
+    }
+    const lastPoint = pointCoords[pointCoords.length - 1];
+    ctx.lineTo(lastPoint.x, lastPoint.y);
+
+    ctx.strokeStyle = 'rgba(0, 247, 255, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.lineTo(lastPoint.x, displayHeight - padding.bottom);
+    ctx.lineTo(pointCoords[0].x, displayHeight - padding.bottom);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 247, 255, 0.14)';
+    ctx.fill();
+
+    if (Number.isInteger(chartState.hoverIndex) && chartState.hoverIndex >= 0 && chartState.hoverIndex < pointCoords.length) {
+      const hoverPoint = pointCoords[chartState.hoverIndex];
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(hoverPoint.x, padding.top);
+      ctx.lineTo(hoverPoint.x, displayHeight - padding.bottom);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0, 247, 255, 1)';
+      ctx.beginPath();
+      ctx.arc(hoverPoint.x, hoverPoint.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (tooltip) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${hoverPoint.x}px`;
+        tooltip.style.top = `${hoverPoint.y}px`;
+        const timeLabel = chartState.labels[hoverPoint.index] || `+${hoverPoint.index + 1}s`;
+        tooltip.innerHTML = `Price: ${hoverPoint.value.toFixed(2)}<br>Time: ${timeLabel}`;
+      }
+    } else if (tooltip) {
+      tooltip.style.display = 'none';
+    }
+  }
+
+  function updateExpectedMetrics() {
+    const bidPrice = parseFloat(bidPriceInput.value);
+    const askPrice = parseFloat(askPriceInput.value);
+
+    const marketBid = Number.isFinite(snapshotState.bestBid) ? snapshotState.bestBid : NaN;
+    const marketAsk = Number.isFinite(snapshotState.bestAsk) ? snapshotState.bestAsk : NaN;
+
+    const effectiveBid = Number.isFinite(bidPrice) ? bidPrice : marketBid;
+    const effectiveAsk = Number.isFinite(askPrice) ? askPrice : marketAsk;
+
+    const hasPair = Number.isFinite(effectiveBid) && Number.isFinite(effectiveAsk) && effectiveAsk > effectiveBid;
+    const mid = hasPair ? (effectiveBid + effectiveAsk) / 2 : NaN;
+    const spread = hasPair ? (effectiveAsk - effectiveBid) : NaN;
+    document.getElementById('metric-mid').textContent = Number.isFinite(mid) ? mid.toFixed(2) : '-';
+    document.getElementById('metric-spread').textContent = Number.isFinite(spread) ? spread.toFixed(2) : '-';
+
+    drawExpectedPriceChart();
+    renderBookLadder();
+  }
+
+  async function refreshMarketSnapshot() {
+    try {
+      const [bestBidRes, bestAskRes, buyRes, sellRes, tradesRes] = await Promise.all([
+        fetch(MM_ENDPOINTS.bestBid),
+        fetch(MM_ENDPOINTS.bestAsk),
+        fetch(MM_ENDPOINTS.buyOrders),
+        fetch(MM_ENDPOINTS.sellOrders),
+        fetch(MM_ENDPOINTS.trades),
+      ]);
+
+      const [bestBidData, bestAskData, buyData, sellData, tradeData] = await Promise.all([
+        bestBidRes.json(),
+        bestAskRes.json(),
+        buyRes.json(),
+        sellRes.json(),
+        tradesRes.json(),
+      ]);
+
+      snapshotState.bestBid = bestBidData?.best_bid?.price != null ? parseFloat(bestBidData.best_bid.price) : NaN;
+      snapshotState.bestAsk = bestAskData?.best_ask?.price != null ? parseFloat(bestAskData.best_ask.price) : NaN;
+      snapshotState.buyLevels = aggregateOrderLevels(buyData?.buy_orders || [], 'buy');
+      snapshotState.sellLevels = aggregateOrderLevels(sellData?.sell_orders || [], 'sell');
+      snapshotState.trades = tradeData?.trades || [];
+
+      renderBookLadder();
+      renderTradeFeed();
+      updateExpectedMetrics();
+    } catch (error) {
+      console.error('Failed to refresh market snapshot:', error);
+    }
+  }
+
+  function setToggleDisabled(fieldId, disabled) {
+    const hiddenInput = document.getElementById(fieldId);
+    const toggleContainer = document.getElementById(`${fieldId}_toggle`);
+
+    if (hiddenInput) {
+      hiddenInput.dataset.locked = disabled ? 'true' : 'false';
+    }
+
+    if (toggleContainer) {
+      toggleContainer.classList.toggle('is-disabled', disabled);
+      toggleContainer.querySelectorAll('.yn-option').forEach((button) => {
+        button.disabled = disabled;
+      });
+    }
+  }
+
+  function setBinaryToggle(fieldId, value, options = {}) {
+    const hiddenInput = document.getElementById(fieldId);
+    if (!hiddenInput || hiddenInput.dataset.locked === 'true') {
+      return;
+    }
+
+    hiddenInput.value = value;
+    const toggleContainer = document.getElementById(`${fieldId}_toggle`);
+    if (toggleContainer) {
+      toggleContainer.querySelectorAll('.yn-option').forEach((button) => {
+        const isActive = button.dataset.value === value;
+        button.classList.toggle('active', isActive);
+      });
+    }
+
+    if (options.trigger !== false) {
+      const side = fieldId.startsWith('bid_') ? 'bid' : 'ask';
+      toggleOrderOptions(side);
+    }
+  }
+
+  function toggleOrderOptions(side) {
+    const isIOC = document.getElementById(`${side}_is_ioc`).value === "True";
+    const isStoploss = document.getElementById(`${side}_stoploss`).value === "YES";
+    const targetPriceGroup = document.getElementById(`${side}_target_group`);
+    const targetInput = document.getElementById(`${side}_target`);
+
+    if (isIOC) {
+      setBinaryToggle(`${side}_stoploss`, 'NO', { trigger: false });
+      setToggleDisabled(`${side}_stoploss`, true);
+      targetPriceGroup.style.display = "none";
+    } else {
+      setToggleDisabled(`${side}_stoploss`, false);
+    }
+
+    if (isStoploss) {
+      targetPriceGroup.style.display = "block";
+      targetInput.required = true;
+      setBinaryToggle(`${side}_is_ioc`, 'False', { trigger: false });
+      setToggleDisabled(`${side}_is_ioc`, true);
+    } else {
+      targetPriceGroup.style.display = "none";
+      targetInput.required = false;
+      if (!isIOC) setToggleDisabled(`${side}_is_ioc`, false);
+    }
+  }
+
+  function submitTwoSided(event) {
+    event.preventDefault();
+    
+    // Get values
+    const bidQty = parseInt(document.getElementById('bid_quantity').value) || 0;
+    const bidDisc = parseInt(document.getElementById('bid_disclosed').value) || Math.max(1, Math.ceil(0.1 * bidQty));
+    const bidPrice = parseFloat(document.getElementById('bid_price').value) || 0;
+    
+    const askQty = parseInt(document.getElementById('ask_quantity').value) || 0;
+    const askDisc = parseInt(document.getElementById('ask_disclosed').value) || Math.max(1, Math.ceil(0.1 * askQty));
+    const askPrice = parseFloat(document.getElementById('ask_price').value) || 0;
+    
+    console.log('🚀 submitTwoSided called');
+    console.log('Bid:', {qty: bidQty, disc: bidDisc, price: bidPrice});
+    console.log('Ask:', {qty: askQty, disc: askDisc, price: askPrice});
+    
+    // Validate required fields
+    if (!bidQty || !bidPrice || !askQty || !askPrice) {
+      alert('❌ Error: All quantity and price fields are required');
+      return;
+    }
+
+    if (bidQty !== askQty) {
+      alert(`❌ Error: Bid and Ask quantities must be the same.\n\nBid Qty: ${bidQty}\nAsk Qty: ${askQty}`);
+      return;
+    }
+    
+    // Validate spread (ask must be STRICTLY greater than bid)
+    if (askPrice <= bidPrice) {
+      alert(`❌ Error: Ask price (${askPrice}) must be GREATER than Bid price (${bidPrice})\n\nSpread too tight! Example: Bid 99.50, Ask 100.50`);
+      return;
+    }
+    
+    // Validate disclosed quantities (min 10%)
+    const minBidDisc = Math.ceil(0.1 * bidQty);
+    const minAskDisc = Math.ceil(0.1 * askQty);
+    
+    if (bidDisc < minBidDisc) {
+      alert(`❌ Bid: Disclosed quantity must be at least 10% (min: ${minBidDisc}, you entered: ${bidDisc})`);
+      return;
+    }
+    if (askDisc < minAskDisc) {
+      alert(`❌ Ask: Disclosed quantity must be at least 10% (min: ${minAskDisc}, you entered: ${askDisc})`);
+      return;
+    }
+    
+    // Auto-fill disclosed if empty
+    if (!document.getElementById('bid_disclosed').value) {
+      document.getElementById('bid_disclosed').value = minBidDisc;
+    }
+    if (!document.getElementById('ask_disclosed').value) {
+      document.getElementById('ask_disclosed').value = minAskDisc;
+    }
+    
+    const bidPayload = buildOrderPayload('BUY');
+    const askPayload = buildOrderPayload('SELL');
+    
+    console.log('📦 Payloads ready:');
+    console.log('Bid payload:', bidPayload);
+    console.log('Ask payload:', askPayload);
+    
+    // Show loading state
+    const submitBtn = document.getElementById('submitBtn');
+    const originalText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '⏳ Placing BID order...';
+
+    // Send BID first, then ASK (sequential instead of parallel for better control)
+    console.log('📤 Sending BID order...');
+    postOrder(bidPayload)
+      .then(bidResult => {
+        console.log('📨 BID response:', bidResult);
+        
+        if (!bidResult.success) {
+          throw new Error(`BID failed: ${bidResult.message}`);
+        }
+        
+        // BID successful, now send ASK
+        console.log('✅ BID placed successfully, now sending ASK...');
+        submitBtn.textContent = '⏳ Placing ASK order...';
+        
+        return postOrder(askPayload).then(askResult => {
+          console.log('📨 ASK response:', askResult);
+          return [bidResult, askResult];
+        });
+      })
+      .then(results => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        
+        const bidSuccess = results[0]?.success;
+        const askSuccess = results[1]?.success;
+        
+        console.log(`✓ BID: ${bidSuccess}, ✓ ASK: ${askSuccess}`);
+        
+        if (bidSuccess && askSuccess) {
+          console.log('✅ BOTH orders successful!');
+          alert('✅ SUCCESS!\n\nBoth Bid and Ask orders placed on orderbook:\n\n' +
+                `• BID: ${bidQty} @ ${bidPrice}\n` +
+                `• ASK: ${askQty} @ ${askPrice}\n\n` +
+                'Refreshing page...');
+          setTimeout(() => window.location.reload(), 1500);
+        } else {
+          const errors = [];
+          if (!bidSuccess) errors.push(`🔴 Bid: ${results[0]?.message}`);
+          if (!askSuccess) errors.push(`🔴 Ask: ${results[1]?.message}`);
+          alert('❌ Problem with orders:\n\n' + errors.join('\n'));
+        }
+      })
+      .catch((err) => {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalText;
+        console.error('💥 Error:', err.message);
+        alert('❌ Error: ' + err.message);
+      });
+  }
+
+  function buildOrderPayload(orderType) {
+    const side = orderType === 'BUY' ? 'bid' : 'ask';
+    const oppositeSide = side === 'bid' ? 'ask' : 'bid';
+    const qty = parseInt(document.getElementById(`${side}_quantity`).value) || 0;
+    const oppositeQty = parseInt(document.getElementById(`${oppositeSide}_quantity`).value) || 0;
+    const disclosed = parseInt(document.getElementById(`${side}_disclosed`).value) || Math.max(1, Math.ceil(0.1 * qty));
+    
+    const payload = {
+      order_type: orderType,
+      quantity: qty.toString(),
+      paired_quantity: oppositeQty.toString(),
+      disclosed_quantity: disclosed.toString(),
+      price: document.getElementById(`${side}_price`).value,
+      is_ioc: document.getElementById(`${side}_is_ioc`).value || 'False',
+      Stoploss_order: document.getElementById(`${side}_stoploss`).value || 'NO',
+      Target_price: document.getElementById(`${side}_target`).value || '',
+    };
+    
+    console.log(`Built ${orderType} payload:`, payload);
+    return payload;
+  }
+
+  function postOrder(payload) {
+    console.log(`📤 Posting ${payload.order_type} order to server...`);
+    
+    // Build form data carefully
+    const formData = new URLSearchParams();
+    formData.append('order_type', payload.order_type);
+    formData.append('quantity', payload.quantity);
+    formData.append('paired_quantity', payload.paired_quantity);
+    formData.append('disclosed_quantity', payload.disclosed_quantity);
+    formData.append('price', payload.price);
+    formData.append('is_ioc', payload.is_ioc);
+    formData.append('Stoploss_order', payload.Stoploss_order);
+    formData.append('Target_price', payload.Target_price);
+    
+    console.log(`Form data being sent for ${payload.order_type}:`, Object.fromEntries(formData));
+    
+    return fetch(window.location.pathname, {
+      method: 'POST',
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: formData
+    })
+      .then(response => {
+        console.log(`${payload.order_type} HTTP response:`, response.status, response.statusText);
+        
+        return response.text().then(text => {
+          console.log(`${payload.order_type} raw response body:`, text.substring(0, 200));
+          
+          try {
+            const data = JSON.parse(text);
+            console.log(`${payload.order_type} parsed JSON:`, data);
+            
+            if (response.ok) {
+              return {success: data.success !== false, message: data.message || 'Order placed'};
+            } else {
+              return {success: false, message: data.message || 'Server error'};
+            }
+          } catch (e) {
+            console.log(`${payload.order_type} - Failed to parse JSON:`, e.message);
+            if (response.ok) {
+              return {success: true, message: 'Order placed successfully'};
+            } else {
+              return {success: false, message: `HTTP ${response.status}`};
+            }
+          }
+        });
+      })
+      .catch(err => {
+        console.error(`${payload.order_type} network error:`, err);
+        return {
+          success: false,
+          message: `Network error: ${err.message}`
+        };
+      });
+  }
+
+  function resetFormFields() {
+    document.getElementById('mmForm').reset();
+    setToggleDisabled('bid_is_ioc', false);
+    setToggleDisabled('bid_stoploss', false);
+    setToggleDisabled('ask_is_ioc', false);
+    setToggleDisabled('ask_stoploss', false);
+    setBinaryToggle('bid_is_ioc', 'False', { trigger: false });
+    setBinaryToggle('bid_stoploss', 'NO', { trigger: false });
+    setBinaryToggle('ask_is_ioc', 'False', { trigger: false });
+    setBinaryToggle('ask_stoploss', 'NO', { trigger: false });
+    toggleOrderOptions('bid');
+    toggleOrderOptions('ask');
+    document.getElementById('bid_min_disc').textContent = '-';
+    document.getElementById('bid_hidden').textContent = '-';
+    document.getElementById('ask_min_disc').textContent = '-';
+    document.getElementById('ask_hidden').textContent = '-';
+  }
+
+  function validateDisclosed(side) {
+    const qtyElem = document.getElementById(`${side}_quantity`);
+    const discElem = document.getElementById(`${side}_disclosed`);
+    const minElem = document.getElementById(`${side}_min_disc`);
+    const hiddenElem = document.getElementById(`${side}_hidden`);
+    
+    if (!qtyElem.value) return;
+    
+    const qty = parseInt(qtyElem.value) || 0;
+    const disc = parseInt(discElem.value) || 0;
+    const minDisc = Math.max(1, Math.ceil(0.1 * qty));
+    const hidden = Math.max(0, qty - disc);
+    
+    if (minElem) minElem.textContent = minDisc;
+    if (hiddenElem) hiddenElem.textContent = hidden;
+    
+    if (disc && disc > qty) {
+      discElem.value = qty;
+    }
+
+    if (disc < minDisc) {
+      discElem.setCustomValidity(`Disclosed quantity must be at least ${minDisc}`);
+    } else if (disc > qty) {
+      discElem.setCustomValidity('Disclosed quantity cannot be greater than actual quantity');
+    } else {
+      discElem.setCustomValidity('');
+    }
+  }
+
+  function updateSpread() {
+    const bidPrice = parseFloat(document.getElementById('bid_price').value) || 0;
+    const askPrice = parseFloat(document.getElementById('ask_price').value) || 0;
+    const spread = askPrice - bidPrice;
+    
+    // Remove any existing warnings
+    const existingWarning = document.querySelector('[data-warning="spread"]');
+    if (existingWarning) existingWarning.remove();
+    
+    if (askPrice > 0 && bidPrice > 0) {
+      if (spread <= 0) {
+        const warning = document.createElement('div');
+        warning.setAttribute('data-warning', 'spread');
+        warning.style.cssText = 'padding: 8px; background: rgba(248,81,73,0.1); border: 1px solid #f85149; border-radius: 6px; color: #f85149; margin-bottom: 8px; font-size: 0.9rem;';
+        warning.textContent = '⚠️ INVALID SPREAD: Ask must be GREATER than Bid (ask <= bid will cause self-matching)';
+        const formGrid = document.querySelector('.mm-form-grid');
+        if (formGrid && formGrid.parentElement) {
+          formGrid.parentElement.insertBefore(warning, formGrid);
+        }
+      } else if (spread > 0) {
+        // Show positive feedback for valid spread
+        console.log(`✓ Valid spread: ${spread.toFixed(2)} (Bid: ${bidPrice}, Ask: ${askPrice})`);
+      }
+    }
+
+    updateExpectedMetrics();
+  }
+
+  function cancelOrder(orderId) {
+    if (!confirm("Cancel order?")) return;
+    fetch("{% url 'mm_cancel' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify({ order_id: orderId })
+    }).then(r => r.json()).then(d => {
+      if (d.success) document.getElementById('order-' + orderId).remove();
+      else alert(d.message);
+    });
+  }
+
+  function cancelStoploss(orderId) {
+    if (!confirm("Cancel stoploss order?")) return;
+    fetch("{% url 'mm_cancel_stoploss' %}", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+      body: JSON.stringify({ order_id: orderId })
+    }).then(r => r.json()).then(d => {
+      if (d.success) document.getElementById('stoploss-' + orderId).remove();
+      else alert(d.message);
+    });
+  }
+
+  toggleOrderOptions('bid');
+  toggleOrderOptions('ask');
+  setupExpectedChartInteractions();
+  setSnapshotTab('book');
+  updateExpectedMetrics();
+  refreshMarketSnapshot();
+  setInterval(refreshMarketSnapshot, 5000);
+</script>
+{% endblock %}

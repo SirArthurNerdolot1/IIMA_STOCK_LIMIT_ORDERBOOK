@@ -1,0 +1,71 @@
+{% extends 'trading/base.html' %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+<style>
+  .auth-wrap {
+    min-height: calc(100vh - 220px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .auth-card {
+    width: 100%;
+    max-width: 460px;
+    text-align: center;
+  }
+
+  .auth-card h2 {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    color: var(--accent);
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.5);
+  }
+
+  .auth-sub {
+    color: var(--muted);
+    margin-bottom: 20px;
+  }
+
+  .auth-link {
+    margin-top: 16px;
+    color: var(--muted);
+  }
+
+  .auth-link a {
+    color: var(--accent);
+    text-decoration: none;
+  }
+
+  .auth-link a:hover {
+    text-decoration: underline;
+  }
+</style>
+
+<div class="auth-wrap">
+  <div class="card auth-card">
+    <form method="post" action="{% url 'login' %}">
+      {% csrf_token %}
+      <h2>Welcome Back</h2>
+      <p class="auth-sub">Login to access your account</p>
+
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" class="form-control" name="username" id="username" required>
+      </div>
+
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" class="form-control" name="password" id="password" required>
+      </div>
+
+      <button type="submit" class="btn" style="width: 100%;">Login</button>
+      <div class="auth-link">
+        <p>Don't have an account? <a href="{% url 'register' %}">Register</a></p>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,54 @@
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+*.rdb
+
+# Database
+db.sqlite3
+*.sqlite3
+
+# Node modules (frontend)
+node_modules/
+trading_system/frontend/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Docs
+doc*.pdf
+*.pdf
+README.md
+setup_not_req.md
+
+# Zone identifiers (Windows/WSL)
+*:Zone.Identifier
+
+# Django
+staticfiles/
+media/
+
+# Misc
+dump.rdb
+data.json

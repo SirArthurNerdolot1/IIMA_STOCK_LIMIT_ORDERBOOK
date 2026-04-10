@@ -1,0 +1,637 @@
+{% extends 'trading/base.html' %}
+
+{% block title %}Trader Dashboard{% endblock %}
+
+{% block content %}
+<style>
+  .welcome-card {
+    text-align: center;
+    margin-bottom: 18px;
+  }
+
+  .welcome-card h2 {
+    font-size: 1.9rem;
+    margin-bottom: 8px;
+    text-shadow: 0 0 12px rgba(0, 255, 255, 0.45);
+  }
+
+  .action-row {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 18px;
+  }
+
+  .action-row .btn {
+    min-width: 180px;
+  }
+
+  .trader-top-grid {
+    display: grid;
+    grid-template-columns: minmax(320px, 1.2fr) minmax(260px, 0.8fr);
+    gap: 18px;
+    margin-bottom: 18px;
+  }
+
+  .trader-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .trader-badge {
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    color: var(--accent);
+    background: rgba(0, 255, 255, 0.1);
+    border-radius: 999px;
+    font-size: 0.67rem;
+    padding: 4px 10px;
+    text-transform: uppercase;
+  }
+
+  .market-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(110px, 1fr));
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .market-metric {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    padding: 8px;
+  }
+
+  .market-metric span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.66rem;
+    margin-bottom: 3px;
+  }
+
+  .market-metric strong {
+    font-size: 0.95rem;
+  }
+
+  .market-note {
+    color: var(--muted);
+    font-size: 0.75rem;
+    line-height: 1.4;
+  }
+
+  .trader-chart-wrap {
+    position: relative;
+    margin-bottom: 10px;
+  }
+
+  #trader-price-chart {
+    width: 100%;
+    height: 130px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.25);
+    display: block;
+  }
+
+  .trader-chart-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(6, 12, 20, 0.95);
+    border: 1px solid rgba(0, 255, 255, 0.45);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 6px 8px;
+    font-size: 0.68rem;
+    line-height: 1.35;
+    white-space: nowrap;
+    box-shadow: 0 0 14px rgba(0, 255, 255, 0.2);
+    transform: translate(-50%, -110%);
+    z-index: 3;
+    display: none;
+  }
+
+  .trader-table-wrap {
+    max-height: 250px;
+    overflow-y: auto;
+  }
+
+  .compact-table {
+    font-size: 0.84rem;
+  }
+
+  .compact-table th,
+  .compact-table td {
+    padding: 9px 10px;
+  }
+
+  .yn-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .yn-option {
+    border: 1px solid rgba(0, 255, 255, 0.32);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 9px 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    font-size: 0.72rem;
+    font-weight: 700;
+    transition: all 0.2s ease;
+  }
+
+  .yn-option:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .yn-option.active {
+    color: var(--accent);
+    border-color: rgba(0, 255, 255, 0.7);
+    box-shadow: 0 0 12px rgba(0, 255, 255, 0.24);
+    background: rgba(0, 255, 255, 0.1);
+  }
+
+  .yn-toggle.is-disabled .yn-option {
+    opacity: 0.55;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  @media (max-width: 980px) {
+    .trader-top-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
+
+<div class="card welcome-card">
+  <h2>Welcome, {{ request.user.username }}!</h2>
+  <p style="color: var(--muted);">Your trading dashboard is ready. Execute orders with precision and speed.</p>
+</div>
+
+<div class="action-row">
+  <a href="{% url 'orderbook' %}" class="btn">Order Book</a>
+</div>
+
+<div class="trader-top-grid">
+  <div class="card">
+      <div class="trader-card-head">
+        <h2 style="margin: 0;">Place Order</h2>
+        <span class="trader-badge">Market Only</span>
+      </div>
+      <p style="color: var(--muted); margin-bottom: 12px;">Traders can only buy or sell at current market price.</p>
+      <form method="post" id="traderForm">
+        {% csrf_token %}
+        <input type="hidden" name="order_mode" value="MARKET">
+        <input type="hidden" name="is_ioc" value="False">
+        <input type="hidden" name="Stoploss_order" value="NO">
+        <input type="hidden" name="Target_price" value="">
+
+        <div class="form-group">
+          <label for="order_type">Order Type</label>
+          <input type="hidden" id="order_type" name="order_type" value="SELL">
+          <div class="yn-toggle" id="order_type_toggle">
+            <button type="button" class="yn-option active" data-value="SELL" onclick="setOrderType('SELL')">Sell</button>
+            <button type="button" class="yn-option" data-value="BUY" onclick="setOrderType('BUY')">Buy</button>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="quantity">Quantity</label>
+          <input type="number" id="quantity" name="quantity" class="form-control" required min="1">
+        </div>
+
+        <div class="form-group">
+          <label for="disclosed_quantity">Disclosed Quantity</label>
+          <input type="number" id="disclosed_quantity" name="disclosed_quantity" class="form-control" required min="1">
+          <small style="color: var(--muted); display: block; margin-top: 5px;">Must be at least 10% of Quantity.</small>
+        </div>
+
+        <div class="form-group">
+          <label id="price-label">Estimated Price</label>
+          <input type="text" id="estimated_price" class="form-control" disabled value="Select Order Type">
+        </div>
+
+        <button type="submit" class="btn" style="width: 100%;">Execute Market Order</button>
+      </form>
+  </div>
+
+  <div class="card">
+    <div class="trader-card-head">
+      <h3 style="margin: 0;">Market Pulse</h3>
+      <span class="trader-badge">Live</span>
+    </div>
+    <div class="market-grid">
+      <div class="market-metric">
+        <span>Best Bid</span>
+        <strong id="pulse-best-bid">-</strong>
+      </div>
+      <div class="market-metric">
+        <span>Best Ask</span>
+        <strong id="pulse-best-ask">-</strong>
+      </div>
+      <div class="market-metric">
+        <span>Spread</span>
+        <strong id="pulse-spread">-</strong>
+      </div>
+      <div class="market-metric">
+        <span>Est. Fill</span>
+        <strong id="pulse-est-fill">-</strong>
+      </div>
+    </div>
+    <div class="trader-chart-wrap">
+      <canvas id="trader-price-chart"></canvas>
+      <div id="trader-price-tooltip" class="trader-chart-tooltip"></div>
+    </div>
+    <p class="market-note">Est. Fill follows your selected side and top-of-book availability.</p>
+  </div>
+</div>
+
+<div class="row">
+  <div class="col">
+    <div class="card">
+      <h3>Active Orders</h3>
+      <div class="table-responsive trader-table-wrap">
+        {% if orders %}
+        <table class="table compact-table">
+          <thead>
+            <tr>
+              <th>Side</th>
+              <th>Qty</th>
+              <th>Disclosed</th>
+              <th>Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for order in orders %}
+            {% if order.quantity > 0 %}
+            <tr id="order-{{ order.id }}">
+              <td style="color: {% if order.order_type == 'BUY' %}var(--success){% else %}var(--danger){% endif %}">
+                {{ order.order_type }}
+              </td>
+              <td>{{ order.quantity }}</td>
+              <td>{{ order.disclosed }}</td>
+              <td>{% if order.is_matched %}Partial{% else %}Unmatched{% endif %}</td>
+              <td>
+                <button class="btn btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="cancelOrder('{{ order.id }}')">Cancel</button>
+              </td>
+            </tr>
+            {% endif %}
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center" style="color: var(--muted); padding: 16px 0;">No active orders.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="card">
+      <h3>Recent Trades</h3>
+      <div class="table-responsive trader-table-wrap">
+        {% if trades %}
+        <table class="table compact-table">
+          <thead>
+            <tr>
+              <th>Buyer</th>
+              <th>Seller</th>
+              <th>Qty</th>
+              <th>Price</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for trade in trades %}
+            <tr>
+              <td>{{ trade.buyer.username }}</td>
+              <td>{{ trade.seller.username }}</td>
+              <td>{{ trade.quantity }}</td>
+              <td>{{ trade.price }}</td>
+              <td>{{ trade.timestamp|date:"H:i:s" }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="text-center" style="color: var(--muted);">No trades yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const TRADER_ENDPOINTS = {
+    bestAsk: "{% url 'get_best_ask' %}",
+    bestBid: "{% url 'get_best_bid' %}",
+    trades: "{% url 'get_recent_trades' %}",
+    cancel: "{% url 'trader_cancel' %}",
+  };
+
+  const traderChartState = {
+    points: [],
+    labels: [],
+    coords: [],
+    hoverIndex: null,
+  };
+
+  const quantityInput = document.getElementById('quantity');
+  const disclosedInput = document.getElementById('disclosed_quantity');
+
+  quantityInput.addEventListener('input', function () {
+    disclosedInput.value = this.value;
+    validateDisclosed();
+  });
+
+  disclosedInput.addEventListener('input', validateDisclosed);
+
+  function setupTraderChartInteractions() {
+    const canvas = document.getElementById('trader-price-chart');
+    const tooltip = document.getElementById('trader-price-tooltip');
+    if (!canvas || !tooltip) return;
+
+    canvas.addEventListener('mousemove', (event) => {
+      if (!traderChartState.coords.length) {
+        tooltip.style.display = 'none';
+        return;
+      }
+
+      const rect = canvas.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+
+      let nearestIndex = 0;
+      let nearestDistance = Math.abs(traderChartState.coords[0].x - x);
+      for (let index = 1; index < traderChartState.coords.length; index += 1) {
+        const distance = Math.abs(traderChartState.coords[index].x - x);
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      }
+
+      traderChartState.hoverIndex = nearestIndex;
+      drawTraderPriceChart();
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+      traderChartState.hoverIndex = null;
+      tooltip.style.display = 'none';
+      drawTraderPriceChart();
+    });
+  }
+
+  function drawTraderPriceChart() {
+    const canvas = document.getElementById('trader-price-chart');
+    const tooltip = document.getElementById('trader-price-tooltip');
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    const pixelRatio = window.devicePixelRatio || 1;
+    const displayWidth = Math.max(canvas.clientWidth, 280);
+    const displayHeight = 130;
+    const padding = { top: 10, right: 44, bottom: 18, left: 12 };
+    const plotWidth = displayWidth - padding.left - padding.right;
+    const plotHeight = displayHeight - padding.top - padding.bottom;
+
+    canvas.width = displayWidth * pixelRatio;
+    canvas.height = displayHeight * pixelRatio;
+    ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+
+    ctx.clearRect(0, 0, displayWidth, displayHeight);
+
+    const points = traderChartState.points;
+    if (!points.length) {
+      ctx.fillStyle = 'rgba(126, 168, 187, 0.8)';
+      ctx.font = '12px Orbitron';
+      ctx.fillText('No recent trade prices', 14, 66);
+      traderChartState.coords = [];
+      if (tooltip) tooltip.style.display = 'none';
+      return;
+    }
+
+    const minValue = Math.min(...points);
+    const maxValue = Math.max(...points);
+    const range = Math.max(maxValue - minValue, 0.0001);
+    const xStep = points.length > 1 ? plotWidth / (points.length - 1) : 0;
+    const yFromValue = (value) => padding.top + (1 - ((value - minValue) / range)) * plotHeight;
+
+    traderChartState.coords = points.map((value, index) => ({
+      x: padding.left + index * xStep,
+      y: yFromValue(value),
+      value,
+      index,
+    }));
+
+    ctx.strokeStyle = 'rgba(126, 168, 187, 0.22)';
+    ctx.lineWidth = 1;
+    const gridRows = 4;
+    for (let row = 0; row <= gridRows; row += 1) {
+      const y = padding.top + (row / gridRows) * plotHeight;
+      ctx.beginPath();
+      ctx.moveTo(padding.left, y);
+      ctx.lineTo(displayWidth - padding.right, y);
+      ctx.stroke();
+
+      const labelValue = maxValue - (row / gridRows) * (maxValue - minValue);
+      ctx.fillStyle = 'rgba(126, 168, 187, 0.8)';
+      ctx.font = '10px Orbitron';
+      ctx.fillText(labelValue.toFixed(2), displayWidth - padding.right + 4, y + 3);
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(traderChartState.coords[0].x, traderChartState.coords[0].y);
+    for (let index = 1; index < traderChartState.coords.length; index += 1) {
+      const prev = traderChartState.coords[index - 1];
+      const current = traderChartState.coords[index];
+      const cx = (prev.x + current.x) / 2;
+      const cy = (prev.y + current.y) / 2;
+      ctx.quadraticCurveTo(prev.x, prev.y, cx, cy);
+    }
+
+    const last = traderChartState.coords[traderChartState.coords.length - 1];
+    ctx.lineTo(last.x, last.y);
+    ctx.strokeStyle = 'rgba(0, 247, 255, 0.95)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.lineTo(last.x, displayHeight - padding.bottom);
+    ctx.lineTo(traderChartState.coords[0].x, displayHeight - padding.bottom);
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(0, 247, 255, 0.14)';
+    ctx.fill();
+
+    if (Number.isInteger(traderChartState.hoverIndex) && traderChartState.hoverIndex >= 0 && traderChartState.hoverIndex < traderChartState.coords.length) {
+      const hoverPoint = traderChartState.coords[traderChartState.hoverIndex];
+
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.28)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(hoverPoint.x, padding.top);
+      ctx.lineTo(hoverPoint.x, displayHeight - padding.bottom);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0, 247, 255, 1)';
+      ctx.beginPath();
+      ctx.arc(hoverPoint.x, hoverPoint.y, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (tooltip) {
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${hoverPoint.x}px`;
+        tooltip.style.top = `${hoverPoint.y}px`;
+        const label = traderChartState.labels[hoverPoint.index] || '-';
+        tooltip.innerHTML = `Price: ${hoverPoint.value.toFixed(2)}<br>Time: ${label}`;
+      }
+    } else if (tooltip) {
+      tooltip.style.display = 'none';
+    }
+  }
+
+  function validateDisclosed() {
+    const qty = parseFloat(quantityInput.value) || 0;
+    const disc = parseFloat(disclosedInput.value) || 0;
+    if (disc < qty * 0.1) {
+      disclosedInput.setCustomValidity(`Disclosed quantity must be at least ${qty * 0.1}`);
+    } else if (disc > qty) {
+      disclosedInput.setCustomValidity('Disclosed quantity cannot be greater than actual quantity');
+    } else {
+      disclosedInput.setCustomValidity('');
+    }
+  }
+
+  function setOrderType(value) {
+    const hiddenInput = document.getElementById('order_type');
+    hiddenInput.value = value;
+    
+    const toggleContainer = document.getElementById('order_type_toggle');
+    if (toggleContainer) {
+      toggleContainer.querySelectorAll('.yn-option').forEach((button) => {
+        const isActive = button.dataset.value === value;
+        button.classList.toggle('active', isActive);
+      });
+    }
+    
+    updatePriceEstimate();
+  }
+
+  function updatePriceEstimate() {
+    const type = document.getElementById('order_type').value;
+    const priceField = document.getElementById('estimated_price');
+
+    const url = type === 'BUY' ? TRADER_ENDPOINTS.bestAsk : TRADER_ENDPOINTS.bestBid;
+
+    priceField.value = "Fetching...";
+
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        const key = type === 'BUY' ? 'best_ask' : 'best_bid';
+        const best = data[key];
+
+        if (best && best.price) {
+          priceField.value = best.price;
+        } else {
+          priceField.value = "Market Price (No pending orders)";
+        }
+
+        updateMarketPulse();
+      })
+      .catch(err => {
+        console.error(err);
+        priceField.value = "Unavailable";
+      });
+  }
+
+  async function updateMarketPulse() {
+    try {
+      const [bestBidResponse, bestAskResponse, tradesResponse] = await Promise.all([
+        fetch(TRADER_ENDPOINTS.bestBid),
+        fetch(TRADER_ENDPOINTS.bestAsk),
+        fetch(TRADER_ENDPOINTS.trades),
+      ]);
+
+      const [bestBidData, bestAskData, tradesData] = await Promise.all([
+        bestBidResponse.json(),
+        bestAskResponse.json(),
+        tradesResponse.json(),
+      ]);
+
+      const bid = bestBidData?.best_bid?.price != null ? parseFloat(bestBidData.best_bid.price) : NaN;
+      const ask = bestAskData?.best_ask?.price != null ? parseFloat(bestAskData.best_ask.price) : NaN;
+      const spread = (Number.isFinite(bid) && Number.isFinite(ask) && ask > bid) ? (ask - bid) : NaN;
+
+      const orderType = document.getElementById('order_type').value;
+      const estFill = orderType === 'BUY' ? ask : bid;
+
+      document.getElementById('pulse-best-bid').textContent = Number.isFinite(bid) ? bid.toFixed(2) : '-';
+      document.getElementById('pulse-best-ask').textContent = Number.isFinite(ask) ? ask.toFixed(2) : '-';
+      document.getElementById('pulse-spread').textContent = Number.isFinite(spread) ? spread.toFixed(2) : '-';
+      document.getElementById('pulse-est-fill').textContent = Number.isFinite(estFill) ? estFill.toFixed(2) : '-';
+
+      const series = (tradesData?.trades || [])
+        .slice(0, 30)
+        .map((trade) => {
+          const price = parseFloat(trade.price);
+          const timestamp = trade.timestamp ? new Date(trade.timestamp) : null;
+          if (!Number.isFinite(price)) return null;
+          return {
+            price,
+            label: timestamp && !Number.isNaN(timestamp.getTime())
+              ? timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+              : '-',
+          };
+        })
+        .filter(Boolean)
+        .reverse();
+
+      traderChartState.points = series.map((point) => point.price);
+      traderChartState.labels = series.map((point) => point.label);
+      drawTraderPriceChart();
+    } catch (error) {
+      console.error('Failed to update market pulse:', error);
+    }
+  }
+
+  function cancelOrder(orderId) {
+    if (!confirm("Are you sure you want to cancel this order?")) return;
+
+    fetch(TRADER_ENDPOINTS.cancel, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': getCookie('csrftoken')
+      },
+      body: JSON.stringify({ order_id: orderId })
+    })
+    .then(res => res.json())
+    .then(data => {
+      if (data.success) {
+        const row = document.getElementById('order-' + orderId);
+        if (row) row.remove();
+      } else {
+        alert(data.message || "Failed to cancel order");
+      }
+    })
+    .catch(err => console.error(err));
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    setupTraderChartInteractions();
+    updatePriceEstimate();
+    updateMarketPulse();
+    setInterval(updateMarketPulse, 5000);
+  });
+</script>
+{% endblock %}
