@@ -2,31 +2,48 @@ from django.db import migrations
 
 
 def remove_orphaned_orders(apps, schema_editor):
-    Order = apps.get_model('trading', 'Order')
-    Stoploss_Order = apps.get_model('trading', 'Stoploss_Order')
-    Trade = apps.get_model('trading', 'Trade')
-    BaseUser = apps.get_model('trading', 'BaseUser')
+    # Use raw SQL DELETE with NOT IN subqueries to reliably remove records
+    # whose foreign-key user references no longer exist in trading_baseuser.
+    # The Django ORM exclude() approach proved unreliable in the previous
+    # migration (0009), so we bypass the ORM entirely here.
 
-    valid_user_ids = set(BaseUser.objects.values_list('id', flat=True))
-
-    orphaned_orders = Order.objects.exclude(user_id__in=valid_user_ids)
-    orphaned_orders.delete()
-
-    orphaned_stoploss_orders = Stoploss_Order.objects.exclude(user_id__in=valid_user_ids)
-    orphaned_stoploss_orders.delete()
-
-    orphaned_trades = Trade.objects.exclude(
-        buyer_id__in=valid_user_ids
-    ).union(
-        Trade.objects.exclude(seller_id__in=valid_user_ids)
+    # --- Order ---
+    schema_editor.execute(
+        """
+        DELETE FROM trading_order
+        WHERE user_id NOT IN (SELECT id FROM trading_baseuser)
+        """
     )
-    # union() returns a non-deletable queryset; collect IDs first
-    orphaned_trade_ids = list(
-        Trade.objects.exclude(buyer_id__in=valid_user_ids).values_list('id', flat=True)
-    ) + list(
-        Trade.objects.exclude(seller_id__in=valid_user_ids).values_list('id', flat=True)
+    # Report how many rows were affected (cursor.rowcount after execute)
+    print(
+        f"[0009] Deleted orphaned trading_order rows "
+        f"(user_id not in trading_baseuser)"
     )
-    Trade.objects.filter(id__in=orphaned_trade_ids).delete()
+
+    # --- Stoploss_Order ---
+    schema_editor.execute(
+        """
+        DELETE FROM trading_stoploss_order
+        WHERE user_id NOT IN (SELECT id FROM trading_baseuser)
+        """
+    )
+    print(
+        f"[0009] Deleted orphaned trading_stoploss_order rows "
+        f"(user_id not in trading_baseuser)"
+    )
+
+    # --- Trade (buyer or seller missing) ---
+    schema_editor.execute(
+        """
+        DELETE FROM trading_trade
+        WHERE buyer_id  NOT IN (SELECT id FROM trading_baseuser)
+           OR seller_id NOT IN (SELECT id FROM trading_baseuser)
+        """
+    )
+    print(
+        f"[0009] Deleted orphaned trading_trade rows "
+        f"(buyer_id or seller_id not in trading_baseuser)"
+    )
 
 
 def do_nothing(apps, schema_editor):
