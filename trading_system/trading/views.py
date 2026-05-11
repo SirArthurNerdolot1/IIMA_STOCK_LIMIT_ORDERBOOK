@@ -1,9 +1,10 @@
 from django.shortcuts import render, redirect
-from .models import BaseUser, Trader, MarketMaker, Order, Trade, Stoploss_Order
+from .models import BaseUser, Trader, MarketMaker, Order, Trade, Stoploss_Order, MarketControl
 from django.db.models import Q
 from django.db import transaction
 from django.utils import timezone
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import ensure_csrf_cookie
 import json
 import logging
 from django.contrib import messages
@@ -102,6 +103,7 @@ def role_router(request):
 
 
 @login_required
+@ensure_csrf_cookie
 def admin_home(request):
     if not _is_admin(request.user):
         return redirect('role_router')
@@ -114,6 +116,8 @@ def admin_home(request):
     spread = None
     if best_bid_price is not None and best_ask_price is not None and best_ask_price >= best_bid_price:
         spread = best_ask_price - best_bid_price
+
+    recent_trades = Trade.objects.select_related('buyer', 'seller').order_by('-timestamp')[:10]
 
     context = {
         'base_role': 'ADMIN',
@@ -129,9 +133,67 @@ def admin_home(request):
         'best_bid_disclosed': best_bid['disclosed'] if best_bid else None,
         'best_ask_disclosed': best_ask['disclosed'] if best_ask else None,
         'last_trade': Trade.objects.order_by('-timestamp').first(),
+        'recent_trades': recent_trades,
     }
 
     return render(request, 'trading/admin.html', context)
+
+
+@login_required
+def get_market_status(request):
+    if request.method == 'GET':
+        try:
+            mc = MarketControl.objects.first()
+            paused = mc.paused if mc else False
+            message = mc.message if mc else ''
+        except Exception:
+            paused = False
+            message = ''
+        return JsonResponse({'paused': paused, 'message': message})
+    return JsonResponse({'paused': False, 'message': ''}, status=405)
+
+
+@login_required
+def toggle_market_pause(request):
+    if not _is_admin(request.user):
+        return JsonResponse({'success': False, 'message': 'Admin access required.'}, status=403)
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            action = data.get('action')
+            message = data.get('message', '')
+            mc, _ = MarketControl.objects.get_or_create(id=1)
+            if action == 'pause':
+                mc.paused = True
+                mc.message = message
+            else:
+                mc.paused = False
+                mc.message = ''
+            mc.save()
+
+            # Try broadcasting to websocket group if channels are configured
+            try:
+                from asgiref.sync import async_to_sync
+                from channels.layers import get_channel_layer
+                channel_layer = get_channel_layer()
+                async_to_sync(channel_layer.group_send)(
+                    'orderbook_group',
+                    {
+                        'type': 'send_order_update',
+                        'payload': {
+                            'event': 'market_pause',
+                            'paused': mc.paused,
+                            'message': mc.message,
+                        }
+                    }
+                )
+            except Exception:
+                pass
+
+            return JsonResponse({'success': True, 'paused': mc.paused, 'message': mc.message})
+        except Exception as e:
+            return JsonResponse({'success': False, 'message': str(e)}, status=500)
+    return JsonResponse({'success': False}, status=405)
 def fetch_best_ask():
     order = Order.objects.filter(
         order_type="SELL",
@@ -193,6 +255,10 @@ def market_maker_home(request):
         return redirect('role_router')
 
     if request.method == "POST":
+        # Block new orders if market is paused
+        mc = MarketControl.objects.first()
+        if mc and mc.paused:
+            return JsonResponse({'success': False, 'message': 'Market activity is paused: ' + (mc.message or 'No reason provided.')}, status=403)
         try:
             order_type = request.POST.get('order_type')
             order_mode = 'LIMIT'
@@ -355,6 +421,10 @@ def trader_home(request):
         return redirect('role_router')
     
     if request.method == "POST":
+        # Block new orders if market is paused
+        mc = MarketControl.objects.first()
+        if mc and mc.paused:
+            return JsonResponse({'success': False, 'message': 'Market activity is paused: ' + (mc.message or 'No reason provided.')}, status=403)
         order_type = request.POST.get('order_type')
         order_mode = "MARKET"
         quantity = int(request.POST.get('quantity'))
@@ -658,8 +728,8 @@ def get_sell_orders(request):
 def get_recent_trades(request):
     if request.method == 'GET':
         recent_trades = Trade.objects.all().order_by('-timestamp')[:10].values(
-            'buyer','seller', 'price', 'quantity', 'timestamp'
-        )  # Adjust fields and ordering as needed
+            'price', 'quantity', 'timestamp'
+        )  # Hide buyer and seller information
         return JsonResponse({'trades': list(recent_trades)})
     return JsonResponse({'trades': []}, status=405)
 

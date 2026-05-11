@@ -3,6 +3,8 @@
 {% block title %}Trader Dashboard{% endblock %}
 
 {% block content %}
+<div id="marketPauseBanner" style="display:none;background:#b91c1c;color:white;padding:10px;border-radius:6px;margin-bottom:12px;text-align:center;">Market Paused</div>
+
 <style>
   .welcome-card {
     text-align: center;
@@ -169,6 +171,18 @@
       grid-template-columns: 1fr;
     }
   }
+
+  #trader-book-ladder {
+    max-height: 180px;
+    overflow-y: auto;
+    font-size: 0.78rem;
+  }
+
+  #trader-book-ladder > div {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+  }
+
 </style>
 
 <div class="card welcome-card">
@@ -250,9 +264,59 @@
       <canvas id="trader-price-chart"></canvas>
       <div id="trader-price-tooltip" class="trader-chart-tooltip"></div>
     </div>
+    
+    <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.05);">
+      <div style="font-size: 0.75rem; color: var(--muted); margin-bottom: 8px; display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 8px;">
+        <div>Size</div>
+        <div>Price</div>
+        <div></div>
+      </div>
+      <div id="trader-book-ladder" style="max-height: 180px; overflow-y: auto; font-size: 0.78rem;"></div>
+    </div>
+    
     <p class="market-note">Est. Fill follows your selected side and top-of-book availability.</p>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async function(){
+  try{
+    const res = await fetch('{% url "get_market_status" %}');
+    const j = await res.json();
+    if(j.paused){
+      const b = document.getElementById('marketPauseBanner');
+      b.textContent = 'Market Paused';
+      b.style.display = 'block';
+      document.getElementById('traderForm').querySelectorAll('button[type=submit], input[type=submit]').forEach(e=>e.disabled=true);
+    }
+  }catch(e){}
+});
+</script>
+
+<script>
+// Real-time WS listener for market pause
+(function(){
+  const ws_scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const socket = new WebSocket(`${ws_scheme}://${window.location.host}/ws/orderbook/`);
+  socket.onmessage = function(ev){
+    try{
+      const raw = JSON.parse(ev.data);
+      const data = raw.data || raw;
+      if(data.event === 'market_pause'){
+        const b = document.getElementById('marketPauseBanner');
+        if(data.paused){
+          b.textContent = 'Market Paused';
+          b.style.display = 'block';
+          document.getElementById('traderForm').querySelectorAll('button[type=submit], input[type=submit]').forEach(e=>e.disabled=true);
+        }else{
+          b.style.display = 'none';
+          document.getElementById('traderForm').querySelectorAll('button[type=submit], input[type=submit]').forEach(e=>e.disabled=false);
+        }
+      }
+    }catch(e){}
+  };
+})();
+</script>
 
 <div class="row">
   <div class="col">
@@ -303,20 +367,16 @@
         <table class="table compact-table">
           <thead>
             <tr>
-              <th>Buyer</th>
-              <th>Seller</th>
-              <th>Qty</th>
               <th>Price</th>
+              <th>Qty</th>
               <th>Time</th>
             </tr>
           </thead>
           <tbody>
             {% for trade in trades %}
             <tr>
-              <td>{{ trade.buyer.username }}</td>
-              <td>{{ trade.seller.username }}</td>
-              <td>{{ trade.quantity }}</td>
               <td>{{ trade.price }}</td>
+              <td>{{ trade.quantity }}</td>
               <td>{{ trade.timestamp|date:"H:i:s" }}</td>
             </tr>
             {% endfor %}
@@ -336,6 +396,8 @@
   const TRADER_ENDPOINTS = {
     bestAsk: "{% url 'get_best_ask' %}",
     bestBid: "{% url 'get_best_bid' %}",
+    buyOrders: "{% url 'get_buy_orders' %}",
+    sellOrders: "{% url 'get_sell_orders' %}",
     trades: "{% url 'get_recent_trades' %}",
     cancel: "{% url 'trader_cancel' %}",
   };
@@ -345,6 +407,8 @@
     labels: [],
     coords: [],
     hoverIndex: null,
+    buyOrders: [],
+    sellOrders: [],
   };
 
   const quantityInput = document.getElementById('quantity');
@@ -499,6 +563,71 @@
     }
   }
 
+  function aggregateTraderOrderLevels(orders, side) {
+    const grouped = {};
+
+    orders.forEach((order) => {
+      const price = parseFloat(order.price);
+      const disclosed = parseFloat(order.disclosed);
+      if (!Number.isFinite(price) || !Number.isFinite(disclosed)) {
+        return;
+      }
+
+      const key = price.toFixed(2);
+      grouped[key] = (grouped[key] || 0) + disclosed;
+    });
+
+    const levels = Object.entries(grouped).map(([price, size]) => ({
+      price: parseFloat(price),
+      size,
+    }));
+
+    if (side === 'buy') {
+      return levels.sort((a, b) => b.price - a.price);
+    } else {
+      return levels.sort((a, b) => a.price - b.price);
+    }
+  }
+
+  function renderTraderBookLadder() {
+    const ladderContainer = document.getElementById('trader-book-ladder');
+    if (!ladderContainer) return;
+
+    const sells = aggregateTraderOrderLevels(traderChartState.sellOrders || [], 'sell').slice(0, 5);
+    const buys = aggregateTraderOrderLevels(traderChartState.buyOrders || [], 'buy').slice(0, 5);
+
+    const allSizes = [...sells.map((level) => level.size), ...buys.map((level) => level.size)];
+    const maxSize = allSizes.length ? Math.max(...allSizes) : 1;
+
+    const sellRows = sells.map((level) => {
+      const width = Math.max(8, (level.size / maxSize) * 100);
+      return `
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.78rem;">
+          <div style="position: relative; overflow: hidden; border-radius: 999px; min-height: 22px; display: flex; align-items: center; padding-left: 8px;">
+            <div style="position: absolute; inset: 0 auto 0 0; border-radius: 999px; opacity: 0.35; background: rgba(248, 81, 73, 0.5); width: ${width}%;"></div>
+            <span style="position: relative; z-index: 1;">${level.size.toFixed(2)}</span>
+          </div>
+          <div style="color: var(--danger);">${level.price.toFixed(2)}</div>
+          <div></div>
+        </div>`;
+    }).join('');
+
+    const buyRows = buys.map((level) => {
+      const width = Math.max(8, (level.size / maxSize) * 100);
+      return `
+        <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; align-items: center; gap: 8px; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.78rem;">
+          <div style="position: relative; overflow: hidden; border-radius: 999px; min-height: 22px; display: flex; align-items: center; padding-left: 8px;">
+            <div style="position: absolute; inset: 0 auto 0 0; border-radius: 999px; opacity: 0.35; background: rgba(46, 160, 67, 0.5); width: ${width}%;"></div>
+            <span style="position: relative; z-index: 1;">${level.size.toFixed(2)}</span>
+          </div>
+          <div style="color: var(--success);">${level.price.toFixed(2)}</div>
+          <div></div>
+        </div>`;
+    }).join('');
+
+    ladderContainer.innerHTML = `${sellRows}${buyRows}`;
+  }
+
   function validateDisclosed() {
     const qty = parseFloat(quantityInput.value) || 0;
     const disc = parseFloat(disclosedInput.value) || 0;
@@ -556,16 +685,20 @@
 
   async function updateMarketPulse() {
     try {
-      const [bestBidResponse, bestAskResponse, tradesResponse] = await Promise.all([
+      const [bestBidResponse, bestAskResponse, tradesResponse, buyOrdersResponse, sellOrdersResponse] = await Promise.all([
         fetch(TRADER_ENDPOINTS.bestBid),
         fetch(TRADER_ENDPOINTS.bestAsk),
         fetch(TRADER_ENDPOINTS.trades),
+        fetch(TRADER_ENDPOINTS.buyOrders),
+        fetch(TRADER_ENDPOINTS.sellOrders),
       ]);
 
-      const [bestBidData, bestAskData, tradesData] = await Promise.all([
+      const [bestBidData, bestAskData, tradesData, buyOrdersData, sellOrdersData] = await Promise.all([
         bestBidResponse.json(),
         bestAskResponse.json(),
         tradesResponse.json(),
+        buyOrdersResponse.json(),
+        sellOrdersResponse.json(),
       ]);
 
       const bid = bestBidData?.best_bid?.price != null ? parseFloat(bestBidData.best_bid.price) : NaN;
@@ -598,7 +731,11 @@
 
       traderChartState.points = series.map((point) => point.price);
       traderChartState.labels = series.map((point) => point.label);
+      traderChartState.buyOrders = buyOrdersData?.buy_orders || [];
+      traderChartState.sellOrders = sellOrdersData?.sell_orders || [];
+      
       drawTraderPriceChart();
+      renderTraderBookLadder();
     } catch (error) {
       console.error('Failed to update market pulse:', error);
     }

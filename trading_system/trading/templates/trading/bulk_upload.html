@@ -198,18 +198,19 @@
 
             <div class="format-guide">
                 <h3>CSV Format Guidelines</h3>
-                <p>Your CSV file should contain the following columns:</p>
+                <p>Your CSV file should contain the following columns (in order):</p>
                 <ul style="margin: 8px 0 8px 24px; color: var(--secondary-text);">
-                    <li>Name (Full name of the user)</li>
-                    <li>Email (Valid email address)</li>
-                    <li>Password(Strong Password)</li>
+                    <li><strong>role</strong> (TRADER or MARKET_MAKER)</li>
+                    <li><strong>username</strong> (unique username)</li>
+                    <li><strong>email</strong> (valid email address)</li>
+                    <li><strong>password</strong> (plain text password)</li>
                 </ul>
                 <div class="csv-example">
-Name, Email, Password<br>
-Tanush, coolgensec@iitk.ac.in,kuch_toh_baat_hai<br>
-Rachit , drunkenmaster@iitk.ac.in,me_no_comments<br>
-Naman,chill_guy@iitk.ac.in,Yo<br>
-Moni Dutt ,fac_queen@iitk.ac.in,hello<br>
+role,username,email,password<br>
+TRADER,tanush,coolgensec@iitk.ac.in,kuch_toh_baat_hai<br>
+MARKET_MAKER,naman,chill_guy@iitk.ac.in,Yo<br>
+TRADER,moni dutt,fac_queen@iitk.ac.in,yo12345<br>
+MARKET_MAKER,rachit,cr@iitk.ac.in,me_no_comments<br>
                 </div>
             </div>
         </div>

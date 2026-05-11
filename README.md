@@ -60,7 +60,7 @@ This project is a web-based trading system that simulates a stock limit order bo
    python manage.py runserver
    ```
 9. **Access the application:**
-   Open your web browser and go to `http://127.0.0.1:8000/`.
+   Open your web browser and go to `http://127.0.0.1  :8000/`.
 
 ## Usage
 

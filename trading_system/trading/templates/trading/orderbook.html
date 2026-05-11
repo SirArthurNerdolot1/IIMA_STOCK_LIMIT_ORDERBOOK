@@ -3,6 +3,8 @@
 {% block title %}Orderbook Dashboard{% endblock %}
 
 {% block content %}
+<div id="marketPauseBannerOB" style="display:none;background:#b91c1c;color:white;padding:10px;border-radius:6px;margin-bottom:12px;text-align:center;">Market Paused</div>
+
 <style>
   .container {
     max-width: 1400px;
@@ -190,10 +192,10 @@
         <table id="trades" class="table">
           <thead>
             <tr>
-              <th>Buyer</th><th>Seller</th><th>Price</th><th>Quantity</th><th>Timestamp</th>
+              <th>Price</th><th>Quantity</th><th>Timestamp</th>
             </tr>
           </thead>
-          <tbody><tr><td colspan="5">Waiting for update...</td></tr></tbody>
+          <tbody><tr><td colspan="3">Waiting for update...</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -236,9 +238,9 @@
       .then(response => response.json())
       .then(data => {
         const buyOrders = data.buy_orders;
-        const headers = ["price", "quantity", "disclosed", "user", "original_quantity"];
+        const headers = ["price", "disclosed"];
         const rows = buyOrders.map(order => headers.map(h => {
-          let val = order[h];
+          let val = h === "disclosed" ? order.disclosed : order[h];
           return `"${(val ?? "").toString().replace(/"/g, '""')}"`;
         }).join(','));
 
@@ -261,9 +263,9 @@
       .then(response => response.json())
       .then(data => {
         const sellOrders = data.sell_orders;
-        const headers = ["price", "quantity", "disclosed", "user", "original_quantity"];
+        const headers = ["price", "disclosed"];
         const rows = sellOrders.map(order => headers.map(h => {
-          let val = order[h];
+          let val = h === "disclosed" ? order.disclosed : order[h];
           return `"${(val ?? "").toString().replace(/"/g, '""')}"`;
         }).join(','));
 
@@ -286,7 +288,7 @@
       .then(response => response.json())
       .then(data => {
         const trades = data.trades;
-        const headers = ["buyer", "seller", "price", "quantity", "timestamp"];
+        const headers = ["price", "quantity", "timestamp"];
         const rows = trades.map(trade => headers.map(h => {
           let val = trade[h];
           return `"${(val ?? "").toString().replace(/"/g, '""')}"`;
@@ -321,11 +323,9 @@
           .filter(o => !o.is_ioc)
           .forEach(o => {
             const price = parseFloat(o.price).toFixed(2);
-            const qty   = parseFloat(o.quantity)  || 0;
             const disc  = parseFloat(o.disclosed) || 0;
 
-            if (!grouped[price]) grouped[price] = { quantity: 0, disclosed: 0 };
-            grouped[price].quantity  += qty;
+            if (!grouped[price]) grouped[price] = { disclosed: 0 };
             grouped[price].disclosed += disc;
 
             if (!buyOrdersByPrice[price]) buyOrdersByPrice[price] = [];
@@ -334,15 +334,12 @@
 
         Object.entries(grouped)
           .sort((a,b) => parseFloat(b[0]) - parseFloat(a[0]))
-          .forEach(([price, {quantity, disclosed}]) => {
+          .forEach(([price, {disclosed}]) => {
             const tr = document.createElement('tr');
-            tr.style.cursor = 'pointer';
             tr.innerHTML = `
               <td>${price}</td>
-              <td>${quantity}</td>
               <td>${disclosed}</td>
             `;
-            tr.addEventListener('click', () => showOrderDetails(price, 'buy'));
             tbody.appendChild(tr);
           });
       });
@@ -395,11 +392,9 @@
           .filter(o => !o.is_ioc)
           .forEach(o => {
             const price     = parseFloat(o.price).toFixed(2);
-            const qty       = parseFloat(o.quantity)  || 0;
             const disclosed = parseFloat(o.disclosed) || 0;
 
-            if (!grouped[price]) grouped[price] = { quantity: 0, disclosed: 0 };
-            grouped[price].quantity  += qty;
+            if (!grouped[price]) grouped[price] = { disclosed: 0 };
             grouped[price].disclosed += disclosed;
 
             if (!sellOrdersByPrice[price]) sellOrdersByPrice[price] = [];
@@ -408,15 +403,12 @@
 
         Object.entries(grouped)
           .sort((a, b) => parseFloat(a[0]) - parseFloat(b[0]))
-          .forEach(([price, { quantity, disclosed }]) => {
+          .forEach(([price, { disclosed }]) => {
             const tr = document.createElement('tr');
-            tr.style.cursor = 'pointer';
             tr.innerHTML = `
               <td>${price}</td>
-              <td>${quantity}</td>
               <td>${disclosed}</td>
             `;
-            tr.addEventListener('click', () => showOrderDetails(price, 'sell'));
             tbody.appendChild(tr);
           });
       })
@@ -432,8 +424,6 @@
         data.trades.forEach(trade => {
           const row = `
             <tr>
-              <td>${trade.buyer}</td>
-              <td>${trade.seller}</td>
               <td>${trade.price}</td>
               <td>${trade.quantity}</td>
               <td>${trade.timestamp}</td>
@@ -462,6 +452,17 @@
   socket.onmessage = (event) => {
     const raw = JSON.parse(event.data);
     const data = raw.data || raw;
+
+    // handle market pause events
+    if (data.event === 'market_pause') {
+      const banner = document.getElementById('marketPauseBannerOB');
+      if (data.paused) {
+        banner.textContent = 'Market Paused';
+        banner.style.display = 'block';
+      } else {
+        banner.style.display = 'none';
+      }
+    }
 
     const statusEl = document.getElementById("status");
     if (statusEl) statusEl.innerText = "Live";
