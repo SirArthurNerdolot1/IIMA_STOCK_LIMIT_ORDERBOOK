@@ -70,5 +70,7 @@ urlpatterns = [
     path('orderbook/get_buy_orders/', views.get_buy_orders, name='get_buy_orders'),
     path('orderbook/get_sell_orders/', views.get_sell_orders, name='get_sell_orders'),
     path('orderbook/get_recent_trades/', views.get_recent_trades, name='get_recent_trades'),
+    path('orderbook/get_market_status/', views.get_market_status, name='get_market_status'),
+    path('market/toggle_market_pause/', views.toggle_market_pause, name='toggle_market_pause'),
 ]
 

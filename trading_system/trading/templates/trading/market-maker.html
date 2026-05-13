@@ -3,6 +3,8 @@
 {% block title %}Market Maker{% endblock %}
 
 {% block content %}
+<div id="marketPauseBannerMM" style="display:none;background:#b91c1c;color:white;padding:10px;border-radius:6px;margin-bottom:12px;text-align:center;">Market Paused</div>
+
 <style>
   .mm-page {
     display: flex;
@@ -567,20 +569,16 @@
         <table class="table compact-table">
           <thead>
             <tr>
-              <th>Buyer</th>
-              <th>Seller</th>
-              <th>Qty</th>
               <th>Price</th>
+              <th>Qty</th>
               <th>Time</th>
             </tr>
           </thead>
           <tbody>
             {% for trade in trades %}
             <tr>
-              <td>{{ trade.buyer.username }}</td>
-              <td>{{ trade.seller.username }}</td>
-              <td>{{ trade.quantity }}</td>
               <td>{{ trade.price }}</td>
+              <td>{{ trade.quantity }}</td>
               <td>{{ trade.timestamp|date:"H:i:s" }}</td>
             </tr>
             {% endfor %}
@@ -593,6 +591,46 @@
     </div>
   </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', async function(){
+  try{
+    const res = await fetch('{% url "get_market_status" %}');
+    const j = await res.json();
+    if(j.paused){
+      const b = document.getElementById('marketPauseBannerMM');
+      b.textContent = 'Market Paused';
+      b.style.display = 'block';
+      document.querySelectorAll('form button[type=submit], form input[type=submit]').forEach(e=>e.disabled=true);
+    }
+  }catch(e){}
+});
+</script>
+
+<script>
+// Real-time WS listener for market pause
+(function(){
+  const ws_scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  const socket = new WebSocket(`${ws_scheme}://${window.location.host}/ws/orderbook/`);
+  socket.onmessage = function(ev){
+    try{
+      const raw = JSON.parse(ev.data);
+      const data = raw.data || raw;
+      if(data.event === 'market_pause'){
+        const b = document.getElementById('marketPauseBannerMM');
+        if(data.paused){
+          b.textContent = 'Market Paused';
+          b.style.display = 'block';
+          document.querySelectorAll('form button[type=submit], form input[type=submit]').forEach(e=>e.disabled=true);
+        }else{
+          b.style.display = 'none';
+          document.querySelectorAll('form button[type=submit], form input[type=submit]').forEach(e=>e.disabled=false);
+        }
+      }
+    }catch(e){}
+  };
+})();
+</script>
 {% endblock %}
 
 {% block scripts %}

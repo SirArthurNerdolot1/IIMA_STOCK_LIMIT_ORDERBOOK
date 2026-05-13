@@ -97,18 +97,18 @@ class Stoploss_Order(models.Model):
         ('BUY', 'Buy'),
         ('SELL', 'Sell'),
     ]
-
     ORDER_MODE_CHOICES = [
         ('LIMIT', 'Limit'),
         ('MARKET', 'Market'),
     ]
-    
+
     user = models.ForeignKey(BaseUser, on_delete=models.CASCADE)
+    user_role = models.CharField(max_length=30, choices=BaseUser.ROLE_CHOICES, default='MARKET_MAKER')
     order_type = models.CharField(max_length=10, choices=ORDER_TYPE_CHOICES)
-    order_mode = models.CharField(max_length=10, choices=ORDER_MODE_CHOICES)
+    order_mode = models.CharField(max_length=10, choices=ORDER_MODE_CHOICES, default='MARKET')
     quantity = models.IntegerField()
-    disclosed= models.IntegerField(default=0)
-    target_price=models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    disclosed = models.IntegerField(default=0)
+    target_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     timestamp = models.DateTimeField(auto_now_add=True)
     is_matched = models.BooleanField(default=False)
@@ -116,3 +116,12 @@ class Stoploss_Order(models.Model):
 
     def __str__(self):
         return f"StopLoss {self.order_type} Order #{self.id} (Target: {self.target_price})"
+
+
+class MarketControl(models.Model):
+    """Simple singleton model to control market state (paused/unpaused)."""
+    paused = models.BooleanField(default=False)
+    message = models.CharField(max_length=255, blank=True, null=True)
+
+    def __str__(self):
+        return f"MarketControl(paused={self.paused})"

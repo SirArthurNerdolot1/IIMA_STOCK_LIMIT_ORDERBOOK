@@ -163,8 +163,7 @@
         <h3>Order Management</h3>
         <div class="admin-links">
           <a class="btn" href="{% url 'orderbook' %}">View Live Orderbook</a>
-          <a class="btn" href="{% url 'modify' %}">Modify Orderbook</a>
-          <a class="btn" href="{% url 'modify_page' %}">Edit Specific Order</a>
+          <button id="togglePauseBtn" class="btn">Pause Market</button>
         </div>
         <p class="small-note">Inspect liquidity, adjust order state, and correct specific records.</p>
       </div>
@@ -180,4 +179,100 @@
     </div>
   </div>
 </div>
+<div class="row" style="margin-top:18px;">
+  <div class="col">
+    <div class="card">
+      <h3>Recent Trades</h3>
+      <div style="overflow:auto;">
+        <table style="width:100%;border-collapse:collapse;">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px;color:var(--muted)">Buyer</th>
+              <th style="text-align:left;padding:8px;color:var(--muted)">Seller</th>
+              <th style="text-align:left;padding:8px;color:var(--muted)">Price</th>
+              <th style="text-align:left;padding:8px;color:var(--muted)">Quantity</th>
+              <th style="text-align:left;padding:8px;color:var(--muted)">Time</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for t in recent_trades %}
+            <tr>
+              <td style="padding:8px">{{ t.buyer.username }}</td>
+              <td style="padding:8px">{{ t.seller.username }}</td>
+              <td style="padding:8px">{{ t.price }}</td>
+              <td style="padding:8px">{{ t.quantity }}</td>
+              <td style="padding:8px">{{ t.timestamp|date:"Y-m-d H:i:s" }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" style="padding:8px">No recent trades</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const btn = document.getElementById('togglePauseBtn');
+  const statusUrl = "{% url 'get_market_status' %}";
+  const toggleUrl = "{% url 'toggle_market_pause' %}";
+
+  function getCsrfToken(){
+    const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+    return match ? decodeURIComponent(match[1]) : '';
+  }
+
+  async function loadStatus(){
+    try{
+      const res = await fetch(statusUrl, {credentials: 'same-origin'});
+      const j = await res.json();
+      btn.textContent = j.paused ? 'Resume Market' : 'Pause Market';
+      btn.dataset.paused = String(!!j.paused);
+    }catch(e){
+      btn.textContent = 'Pause Market';
+      btn.dataset.paused = 'false';
+    }
+  }
+
+  btn.addEventListener('click', async function(){
+    const paused = btn.dataset.paused === 'true';
+    const action = paused ? 'resume' : 'pause';
+    try{
+      const res = await fetch(toggleUrl, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCsrfToken(),
+        },
+        body: JSON.stringify({action: action, message: ''})
+      });
+      const raw = await res.text();
+      let j = {};
+      try {
+        j = raw ? JSON.parse(raw) : {};
+      } catch (parseError) {
+        j = { success: false, message: raw };
+      }
+
+      if (!res.ok) {
+        throw new Error(j.message || `HTTP ${res.status}`);
+      }
+
+      if(j.success){
+        btn.textContent = j.paused ? 'Resume Market' : 'Pause Market';
+        btn.dataset.paused = String(!!j.paused);
+      }else{
+        alert('Failed: ' + (j.message || ''));
+      }
+    }catch(e){
+      alert(e && e.message ? e.message : 'Error toggling market status');
+    }
+  });
+
+  loadStatus();
+});
+</script>
 {% endblock %}
